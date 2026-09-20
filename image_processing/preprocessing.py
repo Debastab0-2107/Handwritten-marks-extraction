@@ -1,7 +1,6 @@
 import cv2
-import numpy as np
 
-def load_and_presprocess(img: cv2.Mat) -> cv2.Mat:
+def load_and_preprocess(img: cv2.Mat) -> cv2.Mat:
     """
     Load image and return three versions:
       - img: original BGR
@@ -13,6 +12,7 @@ def load_and_presprocess(img: cv2.Mat) -> cv2.Mat:
         raise FileNotFoundError(f"Could not load the image")
     # Convert Image to Grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # Apply Gaussian Blur to reduce noise and improve thresholding  
     gray = cv2.GaussianBlur(gray, (3, 3), 0)
 
     #Adaptive Thresholding
@@ -24,7 +24,5 @@ def load_and_presprocess(img: cv2.Mat) -> cv2.Mat:
         blockSize=21,
         C=27
     )
-
-
-    return  img, binary
+    return  img, gray, binary
     
