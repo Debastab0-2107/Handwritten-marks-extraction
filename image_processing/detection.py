@@ -1,140 +1,156 @@
 import cv2
+import numpy as np
 
-def find_ink_components(binary_image: cv2.Mat) -> list:
-    """Find connected white-pixel regions.
-        Returns a list of : 
-            (x, y, width, height, area)
-    """
 
-    num_labels, labels, stats, centroids = (
-        cv2.connectedComponentsWithStats(
-            binary_image,
-            connectivity=8,
-        )
-    )
+import cv2
+import numpy as np
 
-    components = []
-    #Label 0 is the background, so we start from 1
-    for i in range(1, num_labels):
-        x      = stats[i, cv2.CC_STAT_LEFT]
-        y      = stats[i, cv2.CC_STAT_TOP]
-        width  = stats[i, cv2.CC_STAT_WIDTH]
-        height = stats[i, cv2.CC_STAT_HEIGHT]
-        area   = stats[i, cv2.CC_STAT_AREA]
-        components.append((x, y, width, height, area))
 
-    return components
-
-def filter_components(components: list, min_area: int = 155) -> list:
-    """Filter out components that are too small."""
-    filtered = []
-
-    for component in components:
-        x, y, width, height, area = component
-        if area >= min_area:
-            filtered.append(component)
-
-    return filtered
-
-def draw_components(image: cv2.Mat, components: list) -> cv2.Mat:
-    """Draw bounding boxes around components on the image."""
-    output =image.copy()
-    for component in components:
-        x, y, width, height, area = component
-        cv2.rectangle(output, (x, y), (x + width, y + height), (0, 255, 0), 2)
-
-    return output    
-
-def group_into_lines(
-    components,
-    y_tolerance=20
+def detect_text_lines_projection(
+    binary: cv2.Mat,
+    min_ink_ratio: float = 0.03,
+    min_line_height: int = 8,
+    max_gap: int = 3
 ):
     """
-    Group components having similar vertical positions.
+    Detect individual handwritten text lines
+    using a horizontal projection profile.
     """
 
-    components = sorted(
-        components,
-        key=lambda item: item[1]
+    height, width = binary.shape
+
+    # ------------------------------------------------
+    # 1. Calculate ink ratio for every Y row
+    # ------------------------------------------------
+
+    ink_pixels = np.sum(
+        binary > 0,
+        axis=1
     )
 
-    lines = []
+    ink_ratio = ink_pixels / width
 
-    for component in components:
+    # ------------------------------------------------
+    # 2. Smooth the projection
+    # ------------------------------------------------
 
-        x, y, w, h, area = component
+    # Convert to float32 because OpenCV filtering
+    # expects a suitable numeric type.
+    projection = ink_ratio.astype(
+        np.float32
+    )
 
-        center_y = y + h / 2
+    projection = cv2.GaussianBlur(
+        projection.reshape(-1, 1),
+        (1, 7),
+        0
+    ).flatten()
 
-        placed = False
+    # ------------------------------------------------
+    # 3. Threshold the smoothed projection
+    # ------------------------------------------------
 
-        for line in lines:
+    active = projection >= min_ink_ratio
 
-            line_center_y = sum(
-                item[1] + item[3] / 2
-                for item in line
-            ) / len(line)
+    # ------------------------------------------------
+    # 4. Find active vertical regions
+    # ------------------------------------------------
 
-            if abs(
-                center_y - line_center_y
-            ) <= y_tolerance:
+    ranges = []
 
-                line.append(component)
-                placed = True
-                break
+    start = None
+    gap = 0
 
-        if not placed:
+    for y in range(height):
 
-            lines.append(
-                [component]
+        if active[y]:
+
+            if start is None:
+                start = y
+
+            gap = 0
+
+        else:
+
+            if start is not None:
+
+                gap += 1
+
+                if gap > max_gap:
+
+                    end = y - gap
+
+                    if (
+                        end - start + 1
+                        >= min_line_height
+                    ):
+                        ranges.append(
+                            (start, end)
+                        )
+
+                    start = None
+                    gap = 0
+
+    # ------------------------------------------------
+    # 5. Handle region at bottom
+    # ------------------------------------------------
+
+    if start is not None:
+
+        end = height - 1
+
+        if (
+            end - start + 1
+            >= min_line_height
+        ):
+            ranges.append(
+                (start, end)
             )
 
-    # Left -> right
-    for line in lines:
-
-        line.sort(
-            key=lambda item: item[0]
-        )
-
-    return lines
-
-def get_line_boxes(lines):
+    # ------------------------------------------------
+    # 6. Create bounding boxes
+    # ------------------------------------------------
 
     line_boxes = []
 
-    for line in lines:
+    for y1, y2 in ranges:
 
-        if not line:
+        region = binary[
+            y1:y2 + 1,
+            :
+        ]
+
+        ys, xs = np.where(
+            region > 0
+        )
+
+        if len(xs) == 0:
             continue
 
-        x1 = min(
-            item[0]
-            for item in line
-        )
-
-        y1 = min(
-            item[1]
-            for item in line
-        )
-
-        x2 = max(
-            item[0] + item[2]
-            for item in line
-        )
-
-        y2 = max(
-            item[1] + item[3]
-            for item in line
-        )
+        x1 = int(xs.min())
+        x2 = int(xs.max())
 
         line_boxes.append(
             (
                 x1,
                 y1,
-                x2 - x1,
-                y2 - y1
+                x2 - x1 + 1,
+                y2 - y1 + 1
             )
         )
 
     return line_boxes
 
+
+def calculate_horizontal_projection(binary):
+
+    height, width = binary.shape
+
+    ink_pixels = np.sum(
+        binary > 0,
+        axis=1
+    )
+
+    ink_ratio = ink_pixels / width
+
+    return ink_ratio
