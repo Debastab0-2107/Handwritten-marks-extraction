@@ -1,6 +1,6 @@
 import cv2
 import matplotlib.pyplot as plt
-
+from image_processing.image_loader import load_image
 from image_processing.preprocessing import (
     load_and_preprocess
 )
@@ -19,9 +19,9 @@ from image_processing.detection import (
 # STEP 1: Load image
 # ==========================================
 
-image_path = "input/image5.jpeg"
+image_path = "input/image4.png"
 
-image = cv2.imread(image_path)
+image = load_image(image_path)
 
 if image is None:
     raise FileNotFoundError(
