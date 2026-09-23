@@ -154,3 +154,100 @@ def calculate_horizontal_projection(binary):
     ink_ratio = ink_pixels / width
 
     return ink_ratio
+
+# done on 23rd september 2026
+import cv2
+import numpy as np
+
+
+def detect_table_lines(binary: cv2.Mat):
+    """
+    Detect horizontal and vertical lines
+    present in tables.
+    """
+
+    # ----------------------------------
+    # Horizontal lines
+    # ----------------------------------
+
+    horizontal_kernel = cv2.getStructuringElement(
+        cv2.MORPH_RECT,
+        (40, 1)
+    )
+
+    horizontal_lines = cv2.morphologyEx(
+        binary,
+        cv2.MORPH_OPEN,
+        horizontal_kernel
+    )
+
+    # ----------------------------------
+    # Vertical lines
+    # ----------------------------------
+
+    vertical_kernel = cv2.getStructuringElement(
+        cv2.MORPH_RECT,
+        (1, 40)
+    )
+
+    vertical_lines = cv2.morphologyEx(
+        binary,
+        cv2.MORPH_OPEN,
+        vertical_kernel
+    )
+
+    return horizontal_lines, vertical_lines
+
+def build_table_structure(horizontal_lines, vertical_lines):
+    """
+    Combine horizontal and vertical table lines
+    to create a complete table structure.
+    """
+
+    table_structure = cv2.add(horizontal_lines, vertical_lines)
+
+    return table_structure
+
+def detect_table_regions(table_structure):
+    """
+    Detect large rectangular table regions
+    from the combined table structure.
+
+    Returns:
+        regions: list of (x, y, width, height)
+    """
+
+    # Make the detected lines slightly thicker.
+    kernel = cv2.getStructuringElement(
+        cv2.MORPH_RECT,
+        (3, 3)
+    )
+
+    connected = cv2.dilate(
+        table_structure,
+        kernel,
+        iterations=1
+    )
+
+    # Find connected regions
+    contours, _ = cv2.findContours(
+        connected,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    regions = []
+
+    for contour in contours:
+
+        x, y, w, h = cv2.boundingRect(contour)
+
+        # Ignore very small regions
+        if w < 150 or h < 50:
+            continue
+
+        regions.append(
+            (x, y, w, h)
+        )
+
+    return regions

@@ -9,17 +9,14 @@ from image_processing.deskew import (
     deskew_image
 )
 
-from image_processing.detection import (
-    calculate_horizontal_projection,
-    detect_text_lines_projection
-)
+import image_processing.detection
 
 
 # ==========================================
 # STEP 1: Load image
 # ==========================================
 
-image_path = "input/image4.png"
+image_path = "input/test_example2.png"
 
 image = load_image(image_path)
 
@@ -70,55 +67,88 @@ img, gray, binary = load_and_preprocess(
     deskewed
 )
 
-
 # ==========================================
-# STEP 5: Detect text lines
+# STEP : detect table and show it 
 # ==========================================
 
-line_boxes = detect_text_lines_projection(
-    binary,
-    min_ink_ratio=0.03,
-    min_line_height=8,
-    max_gap=3
+horizontal_lines, vertical_lines = image_processing.detection.detect_table_lines(
+    binary
 )
 
+table_structure = image_processing.detection.build_table_structure(
+    horizontal_lines,
+    vertical_lines
+)
 
-# ==========================================
-# STEP 6: Print detected lines
-# ==========================================
+regions = image_processing.detection.detect_table_regions(
+    table_structure
+)
 
 print(
-    "\nText lines detected:",
-    len(line_boxes)
+    "\nTable regions detected:",
+    len(regions)
 )
 
-print("\nDetected regions:")
-
-for i, (x, y, w, h) in enumerate(
-    line_boxes
-):
+for i, (x, y, w, h) in enumerate(regions):
 
     print(
-        f"Line {i + 1}: "
+        f"Region {i + 1}: "
         f"x={x}, "
         f"y={y}, "
         f"width={w}, "
         f"height={h}"
     )
 
+for i, (x, y, w, h) in enumerate(regions):
 
-# ==========================================
-# STEP 7: Draw boxes
-# ==========================================
+    table_crop = deskewed[
+        y:y + h,
+        x:x + w
+    ]
 
-output = deskewed.copy()
+    filename = f"table_region_{i + 1}.jpg"
 
-for i, (x, y, w, h) in enumerate(
-    line_boxes
-):
+    cv2.imwrite(
+        filename,
+        table_crop
+    )
+
+    print(f"Saved: {filename}")
+    
+# cv2.imwrite(
+#     "horizontal_lines.jpg",
+#     horizontal_lines
+# )
+
+# cv2.imwrite(
+#     "vertical_lines.jpg",
+#     vertical_lines
+# )
+# cv2.imshow(
+#     "Horizontal Lines",
+#     horizontal_lines
+# )
+
+# cv2.imshow(
+#     "Vertical Lines",
+#     vertical_lines
+# )
+cv2.imwrite(
+    "table_structure.jpg",
+    table_structure
+)
+
+cv2.imshow(
+    "Table Structure",
+    table_structure
+)
+
+region_output = deskewed.copy()
+
+for i, (x, y, w, h) in enumerate(regions):
 
     cv2.rectangle(
-        output,
+        region_output,
         (x, y),
         (x + w, y + h),
         (255, 0, 0),
@@ -126,14 +156,89 @@ for i, (x, y, w, h) in enumerate(
     )
 
     cv2.putText(
-        output,
-        f"Line {i + 1}",
+        region_output,
+        f"Table {i + 1}",
         (x, max(y - 5, 15)),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.6,
         (255, 0, 0),
         2
     )
+
+cv2.imwrite(
+    "table_regions.jpg",
+    region_output
+)
+
+cv2.imshow(
+    "Table Regions",
+    region_output
+)
+
+
+# # ==========================================
+# # STEP 5: Detect text lines
+# # ==========================================
+
+# line_boxes = detect_text_lines_projection(
+#     binary,
+#     min_ink_ratio=0.03,
+#     min_line_height=8,
+#     max_gap=3
+# )
+
+
+# # ==========================================
+# # STEP 6: Print detected lines
+# # ==========================================
+
+# print(
+#     "\nText lines detected:",
+#     len(line_boxes)
+# )
+
+# print("\nDetected regions:")
+
+# for i, (x, y, w, h) in enumerate(
+#     line_boxes
+# ):
+
+#     print(
+#         f"Line {i + 1}: "
+#         f"x={x}, "
+#         f"y={y}, "
+#         f"width={w}, "
+#         f"height={h}"
+#     )
+
+
+# # ==========================================
+# # STEP 7: Draw boxes
+# # ==========================================
+
+# output = deskewed.copy()
+
+# for i, (x, y, w, h) in enumerate(
+#     line_boxes
+# ):
+
+#     cv2.rectangle(
+#         output,
+#         (x, y),
+#         (x + w, y + h),
+#         (255, 0, 0),
+#         2
+#     )
+
+#     cv2.putText(
+#         output,
+#         f"Line {i + 1}",
+#         (x, max(y - 5, 15)),
+#         cv2.FONT_HERSHEY_SIMPLEX,
+#         0.6,
+#         (255, 0, 0),
+#         2
+#     )
 
 
 # ==========================================
@@ -150,10 +255,10 @@ cv2.imwrite(
     binary
 )
 
-cv2.imwrite(
-    "detected_text_lines.jpg",
-    output
-)
+# cv2.imwrite(
+#     "detected_text_lines.jpg",
+#     output
+# )
 
 
 # ==========================================
@@ -163,6 +268,7 @@ cv2.imwrite(
 cv2.imshow(
     "Original",
     img
+
 )
 
 cv2.imshow(
@@ -175,49 +281,49 @@ cv2.imshow(
     binary
 )
 
-cv2.imshow(
-    "Detected Text Lines",
-    output
-)
+# cv2.imshow(
+#     "Detected Text Lines",
+#     output
+# )
 
 
-# ==========================================
-# STEP 10: Horizontal projection
-# ==========================================
+# # ==========================================
+# # STEP 10: Horizontal projection
+# # ==========================================
 
-projection = calculate_horizontal_projection(
-    binary
-)
+# projection = calculate_horizontal_projection(
+#     binary
+# )
 
 
-# ==========================================
-# STEP 11: Plot projection
-# ==========================================
+# # ==========================================
+# # STEP 11: Plot projection
+# # ==========================================
 
-plt.figure(
-    figsize=(10, 6)
-)
+# plt.figure(
+#     figsize=(10, 6)
+# )
 
-plt.plot(
-    projection,
-    range(len(projection))
-)
+# plt.plot(
+#     projection,
+#     range(len(projection))
+# )
 
-plt.gca().invert_yaxis()
+# plt.gca().invert_yaxis()
 
-plt.xlabel(
-    "Ink Ratio"
-)
+# plt.xlabel(
+#     "Ink Ratio"
+# )
 
-plt.ylabel(
-    "Y Position"
-)
+# plt.ylabel(
+#     "Y Position"
+# )
 
-plt.title(
-    "Horizontal Projection Profile"
-)
+# plt.title(
+#     "Horizontal Projection Profile"
+# )
 
-plt.show()
+# plt.show()
 
 
 # ==========================================
